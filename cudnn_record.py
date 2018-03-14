@@ -1,3 +1,6 @@
+import subprocess
+import os
+
 class cudnnTrace:
 
     def __init__(self, IN, IC, IH, IW, OC, FH, FW,
@@ -32,10 +35,34 @@ class cudnnTrace:
         self.ground_truth = None
         self._derive_output_shape()
 
+        self.exec_func = "./cudnn_func/cudnn_perf"
+
         if isinstance(cudnn_selected, str):
             self.cudnn_selected = self.algo_dict[cudnn_selected]
         else:
             self.cudnn_selected = cudnn_selected
+
+        return
+
+    def set_exec_func(self, exec_func):
+        self.exec_func = exec_func
+        return
+
+    def collect_runtime_info(self):
+        command_list = [self.exec_func]
+        command_list.extend([str(self.IN), str(self.IC), str(self.IH), str(self.IW),
+                             str(self.OC), str(self.FH), str(self.FW),
+                             str(self.OH), str(self.OW), str(self.pad_h), str(self.pad_w),
+                             str(self.strd_h), str(self.strd_w),
+                             str(self.mode), str(self.conv_format)])
+        proc = subprocess.Popen(command_list, cwd=os.path.realpath(__file__),
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=60)
+            lines = outs.split('\n')
+
+        except Exception as excep:
+            proc.kill()
 
         return
 
