@@ -22,15 +22,21 @@ class cudnnTrace:
         self.mode = mode
         self.conv_format = conv_format
 
+        self.algo_dict = self._get_algo_dict()
+
         self.cudnn_version = None
         self.runtime_info = False
         self.workspace_dict = {}
         self.perf_dict = {}
         self.workspace_limit = workspace_limit
-        self.cudnn_selected = cudnn_selected
         self.ground_truth = None
-
         self._derive_output_shape()
+
+        if isinstance(cudnn_selected, str):
+            self.cudnn_selected = self.algo_dict[cudnn_selected]
+        else:
+            self.cudnn_selected = cudnn_selected
+
         return
 
     def _derive_output_shape(self):
@@ -39,4 +45,12 @@ class cudnnTrace:
         self.OW = int((self.IW + 2 * self.pad_w - self.FW * self.dil_w) / self.strd_w + 1)
         return
 
-
+    def _get_algo_dict(self):
+        return {'CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM': 0,
+                'CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM': 1,
+                'CUDNN_CONVOLUTION_FWD_ALGO_GEMM': 2,
+                'CUDNN_CONVOLUTION_FWD_ALGO_DIRECT': 3,
+                'CUDNN_CONVOLUTION_FWD_ALGO_FFT': 4,
+                'CUDNN_CONVOLUTION_FWD_ALGO_FFT_TILING': 5,
+                'CUDNN_CONVOLUTION_FWD_ALGO_WINOGRAD': 6,
+                'CUDNN_CONVOLUTION_FWD_ALGO_WINOGRAD_NONFUSED': 7}
