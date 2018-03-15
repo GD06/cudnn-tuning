@@ -31,7 +31,7 @@ def main():
                     continue
 
                 for i in tqdm(range(trace_len), desc=input_file):
-                    if cudnn_trace_list[i].runtime_info is None:
+                    if not cudnn_trace_list[i].runtime_info:
                         cudnn_trace_list[i].collect_runtime_info()
 
                     if i % 100 == 0:

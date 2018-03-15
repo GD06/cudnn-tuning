@@ -90,7 +90,7 @@ class cudnnTrace:
             #print(self.workspace_dict)
             #print(self.perf_dict)
 
-            self.runtime_info = 1
+            self.runtime_info = True
             min_time = None
 
             for algo_name, algo_id in self.algo_dict.items():
