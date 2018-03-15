@@ -1,5 +1,6 @@
 import subprocess
 import os
+import re
 
 class cudnnTrace:
 
@@ -35,8 +36,6 @@ class cudnnTrace:
         self.ground_truth = None
         self._derive_output_shape()
 
-        self.exec_func = "./cudnn_func/cudnn_perf"
-
         if isinstance(cudnn_selected, str):
             self.cudnn_selected = self.algo_dict[cudnn_selected]
         else:
@@ -49,19 +48,65 @@ class cudnnTrace:
         return
 
     def collect_runtime_info(self):
+
+        self.exec_func = "./cudnn_func/cudnn_perf"
         command_list = [self.exec_func]
         command_list.extend([str(self.IN), str(self.IC), str(self.IH), str(self.IW),
                              str(self.OC), str(self.FH), str(self.FW),
                              str(self.OH), str(self.OW), str(self.pad_h), str(self.pad_w),
                              str(self.strd_h), str(self.strd_w),
                              str(self.mode), str(self.conv_format)])
-        proc = subprocess.Popen(command_list, cwd=os.path.realpath(__file__),
+        proc = subprocess.Popen(command_list, cwd=os.path.dirname(os.path.realpath(__file__)),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         try:
             outs, errs = proc.communicate(timeout=60)
-            lines = outs.split('\n')
+            lines = outs.decode('utf-8').split('\n')
+
+            #print(lines)
+            for algo_name, algo_id in self.algo_dict.items():
+                self.workspace_dict[algo_id] = None
+                self.perf_dict[algo_id] = None
+
+            if self.workspace_limit is None:
+                algo_match = re.compile(r'Preferred Algo: (?P<algo>\d*)')
+                for line in lines:
+                    match_result = algo_match.match(line)
+                    if match_result is not None:
+                        self.cudnn_selected = int(match_result.group('algo'))
+
+            #print("cudnn selected:", self.cudnn_selected)
+
+            algo_match = re.compile(r"Algo: (?P<algo>\d*), Time: (?P<time>\d*.\d*) ms, "
+                                    "Workspace: (?P<workspace>\d*) bytes")
+            for line in lines:
+                match_result = algo_match.match(line)
+                if match_result is not None:
+                    self.workspace_dict[int(match_result.group('algo'))] = int(
+                        match_result.group('workspace'))
+                    self.perf_dict[int(match_result.group('algo'))] = float(
+                        match_result.group('time'))
+
+            #print(self.workspace_dict)
+            #print(self.perf_dict)
+
+            self.runtime_info = 1
+            min_time = None
+
+            for algo_name, algo_id in self.algo_dict.items():
+                if self.workspace_dict[algo_id] is None:
+                    continue
+                if ((self.workspace_limit is None) or
+                        (self.workspace_dict[algo_id] < self.workspace_limit)):
+                    if ((min_time is None) or (self.perf_dict[algo_id] < min_time)):
+                        self.ground_truth = algo_id
+                        min_time = self.perf_dict[algo_id]
+
+            #print("Limit:", self.workspace_limit)
+            #print("Ground truth:", self.ground_truth)
 
         except Exception as excep:
+            print(repr(excep))
             proc.kill()
 
         return
